@@ -1,10 +1,31 @@
 import { useState, useEffect } from 'react';
 
-const Navbar = () => {
+const Navbar = ({ currentUser, onLogout }) => {
   const [time, setTime] = useState(new Date());
+  const [backendStatus, setBackendStatus] = useState("Connecting...");
+  const [isOnline, setIsOnline] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
+    
+    // Fetch data from backend
+    fetch('http://localhost:5000/api/test')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setBackendStatus("DB & Server Online");
+          setIsOnline(true);
+        } else {
+          setBackendStatus("Backend Error");
+          setIsOnline(false);
+        }
+      })
+      .catch(err => {
+        console.error("Fetch error:", err);
+        setBackendStatus("Backend Offline");
+        setIsOnline(false);
+      });
+
     return () => clearInterval(timer);
   }, []);
 
@@ -21,13 +42,21 @@ const Navbar = () => {
       </div>
       
       <div className="flex items-center gap-6">
-        <div className="hidden md:flex items-center gap-2 glass-card px-4 py-2 bg-black/20">
-          <div className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,1)]"></div>
-          <span className="text-sm text-gray-300">System Online</span>
+        <div className="hidden md:flex items-center gap-2 glass-card px-4 py-2 bg-black/20" title={backendStatus}>
+          <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_rgba(74,222,128,1)] ${isOnline ? 'bg-green-400' : 'bg-red-500'}`}></div>
+          <span className="text-sm text-gray-300">{backendStatus}</span>
         </div>
         <div className="text-sm font-mono text-cyan-300 bg-cyan-950/40 px-3 py-1.5 rounded-md border border-cyan-500/20">
           {time.toLocaleTimeString()}
         </div>
+        {currentUser && (
+          <div className="flex items-center gap-4 border-l border-white/10 pl-4">
+            <span className="text-gray-300 text-sm hidden sm:block">Welcome, <span className="text-white font-medium">{currentUser.name}</span></span>
+            <button onClick={onLogout} className="text-red-400 hover:text-red-300 transition-colors text-sm px-3 py-1.5 border border-red-500/20 rounded-md bg-red-500/10 hover:bg-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.1)]">
+              Sign Out
+            </button>
+          </div>
+        )}
       </div>
     </nav>
   );

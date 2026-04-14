@@ -1,14 +1,36 @@
+import { useState, useEffect } from 'react';
 import Navbar from './components/layout/Navbar';
 import Sidebar from './components/layout/Sidebar';
 import AICorruptionAudit from './components/modules/AICorruptionAudit';
 import ServiceDelayPrediction from './components/modules/ServiceDelayPrediction';
 import OfflineSync from './components/modules/OfflineSync';
 import LocalIssueVoting from './components/modules/LocalIssueVoting';
+import AuthLayout from './components/auth/AuthLayout';
 
 function App() {
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    // Check local storage for user token on load
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setCurrentUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setCurrentUser(null);
+  };
+
+  if (!currentUser) {
+    return <AuthLayout onAuthSuccess={(user) => setCurrentUser(user)} />;
+  }
+
   return (
     <div className="min-h-screen pb-10">
-      <Navbar />
+      <Navbar onLogout={handleLogout} currentUser={currentUser} />
       <div className="max-w-[1600px] mx-auto px-4 lg:px-6 flex gap-6">
         <Sidebar />
         
