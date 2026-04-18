@@ -1,47 +1,238 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const AICorruptionAudit = () => {
-  const [image, setImage] = useState(null);
-  const [status, setStatus] = useState('idle');
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [address, setAddress] = useState('');
+  const [description, setDescription] = useState('');
+  const [contractorInput, setContractorInput] = useState('');
+  const [reportStatus, setReportStatus] = useState('Pending');
+  const [location, setLocation] = useState({ latitude: null, longitude: null });
+  const [manualLat, setManualLat] = useState('');
+  const [manualLng, setManualLng] = useState('');
+  const [status, setStatus] = useState('idle'); // idle, ready, analyzing, complete, error
+  const [detectedIssues, setDetectedIssues] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [gpsStatus, setGpsStatus] = useState('Getting GPS location...');
+  const [department, setDepartment] = useState('');
+  const [contractor, setContractor] = useState('');
+  const [showLocationSearch, setShowLocationSearch] = useState(false);
+  const [locationSearchInput, setLocationSearchInput] = useState('');
+
+  // All Indian States & Major Cities with coordinates
+  const indianLocations = [
+    { name: '📍 Andhra Pradesh - Hyderabad', lat: '17.360589', lng: '78.474845' },
+    { name: '📍 Arunachal Pradesh - Itanagar', lat: '28.2180', lng: '93.6053' },
+    { name: '📍 Assam - Guwahati', lat: '26.1445', lng: '91.7362' },
+    { name: '📍 Bihar - Patna', lat: '25.5941', lng: '85.1376' },
+    { name: '📍 Chhattisgarh - Raipur', lat: '21.2514', lng: '81.6296' },
+    { name: '📍 Goa - Panaji', lat: '15.2993', lng: '73.8243' },
+    { name: '📍 Gujarat - Ahmedabad', lat: '23.0225', lng: '72.5714' },
+    { name: '📍 Haryana - Chandigarh', lat: '30.7333', lng: '76.7794' },
+    { name: '📍 Himachal Pradesh - Shimla', lat: '31.7975', lng: '77.1025' },
+    { name: '🏔️ Jammu & Kashmir - Srinagar', lat: '34.0837', lng: '74.7973' },
+    { name: '📍 Jharkhand - Ranchi', lat: '23.3441', lng: '85.3096' },
+    { name: '🧡 Karnataka - Bangalore', lat: '12.9716', lng: '77.5946' },
+    { name: '📍 Kerala - Kochi', lat: '9.9312', lng: '76.2673' },
+    { name: '🌴 Madhya Pradesh - Bhopal', lat: '23.1815', lng: '79.9864' },
+    { name: '🏝️ Maharashtra - Mumbai', lat: '19.0760', lng: '72.8777' },
+    { name: '📍 Manipur - Imphal', lat: '24.8170', lng: '94.9062' },
+    { name: '📍 Meghalaya - Shillong', lat: '25.5788', lng: '91.8933' },
+    { name: '📍 Mizoram - Aizawl', lat: '23.1815', lng: '92.9789' },
+    { name: '📍 Nagaland - Kohima', lat: '25.6150', lng: '94.1086' },
+    { name: '📍 Odisha - Bhubaneswar', lat: '20.2961', lng: '85.8245' },
+    { name: '📍 Punjab - Chandigarh', lat: '30.7333', lng: '76.7794' },
+    { name: '📍 Rajasthan - Jaipur', lat: '26.9124', lng: '75.7873' },
+    { name: '🌴 Tamil Nadu - Chennai', lat: '13.0827', lng: '80.2707' },
+    { name: '📍 Telangana - Hyderabad', lat: '17.3850', lng: '78.4867' },
+    { name: '📍 Tripura - Agartala', lat: '23.8103', lng: '91.2787' },
+    { name: '⭐ Uttar Pradesh - Lucknow', lat: '26.8467', lng: '80.9462' },
+    { name: '📍 Uttarakhand - Dehradun', lat: '30.3165', lng: '78.0322' },
+    { name: '📍 West Bengal - Kolkata', lat: '22.5726', lng: '88.3639' },
+    { name: '📍 Delhi - New Delhi', lat: '28.7041', lng: '77.1025' }
+  ];
+
+  const filteredLocations = indianLocations.filter(loc =>
+    loc.name.toLowerCase().includes(locationSearchInput.toLowerCase())
+  );
+
+  const setSelectedLocation = (lat, lng) => {
+    setManualLat(lat);
+    setManualLng(lng);
+    setGpsStatus('📍 Manual Location Set');
+    setShowLocationSearch(false);
+    setLocationSearchInput('');
+  };
+
+  // Get GPS location on component mount
+  useEffect(() => {
+    if (navigator.geolocation) {
+      const timeout = setTimeout(() => {
+        setGpsStatus('⏱️ GPS Request Timeout - Try Manual Entry');
+      }, 10000);
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          clearTimeout(timeout);
+          setLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          });
+          setGpsStatus('✓ GPS Location Acquired Successfully');
+        },
+        (error) => {
+          clearTimeout(timeout);
+          console.warn('Geolocation error:', error.message);
+          
+          let errorMsg = '❌ GPS Not Available - ';
+          if (error.code === error.PERMISSION_DENIED) {
+            errorMsg += 'Permission Denied (Check browser settings)';
+          } else if (error.code === error.POSITION_UNAVAILABLE) {
+            errorMsg += 'Position Unavailable';
+          } else {
+            errorMsg += 'Enter Manually';
+          }
+          setGpsStatus(errorMsg);
+        },
+        { timeout: 8000, enableHighAccuracy: false }
+      );
+    } else {
+      setGpsStatus('❌ Geolocation Not Supported - Enter Manually');
+    }
+  }, []);
+
+  const retryGPS = () => {
+    setGpsStatus('🔄 Retrying GPS...');
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          });
+          setGpsStatus('✓ GPS Location Acquired');
+          setError('');
+        },
+        (error) => {
+          console.warn('Geolocation error:', error);
+          setGpsStatus('❌ GPS Not Available - Enter Manually');
+        }
+      );
+    }
+  };
 
   const handleDragOver = (e) => {
     e.preventDefault();
+    e.stopPropagation();
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setupImage(e.dataTransfer.files[0]);
+      setupFile(e.dataTransfer.files[0]);
     }
   };
 
   const handleChange = (e) => {
     if (e.target.files && e.target.files[0]) {
-      setupImage(e.target.files[0]);
+      setupFile(e.target.files[0]);
     }
   };
 
-  const setupImage = (file) => {
+  const setupFile = (file) => {
+    setFile(file);
     const reader = new FileReader();
     reader.onload = (e) => {
-      setImage(e.target.result);
+      setPreview(e.target.result);
       setStatus('ready');
     };
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (status === 'complete') {
-      setImage(null);
-      setStatus('idle');
+      resetForm();
       return;
     }
     
+    // Get effective coordinates (GPS or manual)
+    const finalLat = location.latitude || (manualLat ? parseFloat(manualLat) : null);
+    const finalLng = location.longitude || (manualLng ? parseFloat(manualLng) : null);
+    
+    // Validate required fields
+    if (!file) {
+      setError('❌ Image is required');
+      return;
+    }
+    
+    if (!description.trim()) {
+      setError('❌ Problem description is required');
+      return;
+    }
+
+    if (!address.trim()) {
+      setError('❌ Location address is required');
+      return;
+    }
+    
+    if (!finalLat || !finalLng) {
+      setError('❌ GPS coordinates are required - Use GPS or enter manually');
+      return;
+    }
+
+    setLoading(true);
     setStatus('analyzing');
-    // Simulate AI analysis delay
-    setTimeout(() => {
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('address', address);
+      formData.append('description', description);
+      formData.append('contractorInput', contractorInput);
+      formData.append('reportStatus', reportStatus);
+      formData.append('latitude', finalLat);
+      formData.append('longitude', finalLng);
+
+      const response = await fetch('http://localhost:5000/api/audit/report', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to submit report');
+      }
+
+      const data = await response.json();
+      setDetectedIssues(data.detectedIssues || []);
+      setDepartment(data.department);
+      setContractor(data.contractor);
       setStatus('complete');
-    }, 2500);
+    } catch (err) {
+      setError(err.message || 'Error submitting report');
+      setStatus('error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setFile(null);
+    setPreview(null);
+    setAddress('');
+    setDescription('');
+    setContractorInput('');
+    setReportStatus('Pending');
+    setManualLat('');
+    setManualLng('');
+    setDetectedIssues([]);
+    setStatus('idle');
+    setError('');
+    setDepartment('');
+    setContractor('');
   };
 
   return (
@@ -53,27 +244,231 @@ const AICorruptionAudit = () => {
           </svg>
           AI Corruption Audit
         </h2>
-        {status === 'analyzing' && <span className="animate-pulse text-neon-blue text-sm font-mono border border-neon-blue/40 px-2 py-0.5 rounded bg-neon-blue/10">ANALYZING</span>}
-        {status === 'complete' && <span className="text-green-400 text-sm font-mono border border-green-500/40 px-2 py-0.5 rounded bg-green-500/10">VERIFIED</span>}
+        <div className="flex gap-2">
+          {status === 'analyzing' && <span className="animate-pulse text-neon-blue text-sm font-mono border border-neon-blue/40 px-2 py-0.5 rounded bg-neon-blue/10">ANALYZING</span>}
+          {status === 'complete' && <span className="text-green-400 text-sm font-mono border border-green-500/40 px-2 py-0.5 rounded bg-green-500/10">VERIFIED</span>}
+          {status === 'error' && <span className="text-red-400 text-sm font-mono border border-red-500/40 px-2 py-0.5 rounded bg-red-500/10">ERROR</span>}
+        </div>
       </div>
-      
-      {!image ? (
-        <div 
-          className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-neon-blue/50 transition-all duration-300 glass-card cursor-pointer group"
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          onClick={() => document.getElementById('file-upload').click()}
-        >
-          <input id="file-upload" type="file" className="hidden" accept="image/*" onChange={handleChange} />
-          <svg className="w-12 h-12 mx-auto text-gray-500 mb-3 group-hover:text-neon-blue transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          <p className="text-gray-400 group-hover:text-gray-200 transition-colors">Drag & drop image here or click to browse</p>
+
+      {error && (
+        <div className="mb-4 p-4 bg-red-500/20 border border-red-500/40 rounded-lg text-red-300 text-sm font-mono">
+          {error}
+        </div>
+      )}
+
+      {!preview ? (
+        <div className="space-y-4">
+          {/* Field Requirements Summary */}
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+            <div className="text-xs text-blue-300 mb-2 font-mono">✓ Required Fields:</div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className={`${file ? 'text-green-400' : 'text-gray-400'}`}>
+                {file ? '✓' : '○'} Image uploaded
+              </div>
+              <div className={`${description.trim() ? 'text-green-400' : 'text-gray-400'}`}>
+                {description.trim() ? '✓' : '○'} Description
+              </div>
+              <div className={`${address.trim() ? 'text-green-400' : 'text-gray-400'}`}>
+                {address.trim() ? '✓' : '○'} Address
+              </div>
+              <div className={`${location.latitude || manualLat ? 'text-green-400' : 'text-gray-400'}`}>
+                {location.latitude || manualLat ? '✓' : '○'} Latitude
+              </div>
+              <div className={`${location.longitude || manualLng ? 'text-green-400' : 'text-gray-400'}`}>
+                {location.longitude || manualLng ? '✓' : '○'} Longitude
+              </div>
+            </div>
+          </div>
+
+          {/* Description Input */}
+          <div>
+            <label className="block text-sm font-mono text-gray-300 mb-2">Problem Description *</label>
+            <p className="text-xs text-gray-400 mb-2">Describe the issue you've observed in detail</p>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="E.g., Potholes on main street, damaged footbridge, illegal encroachment..."
+              className="w-full bg-white/10 border border-white/20 rounded-lg p-3 text-white placeholder-gray-500 focus:border-neon-blue focus:outline-none text-sm"
+              rows="3"
+            />
+          </div>
+
+          {/* Address Input */}
+          <div>
+            <label className="block text-sm font-mono text-gray-300 mb-2">📍 Location Address *</label>
+            <p className="text-xs text-gray-400 mb-2">Enter the specific address or location details</p>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="E.g., Main Street near Municipal Building, Ward 45, etc."
+              className="w-full bg-white/10 border border-white/20 rounded-lg p-3 text-white placeholder-gray-500 focus:border-neon-blue focus:outline-none text-sm"
+            />
+          </div>
+
+          {/* Contractor Name Input */}
+          <div>
+            <label className="block text-sm font-mono text-gray-300 mb-2">Contractor Name (if known)</label>
+            <p className="text-xs text-gray-400 mb-2">Enter the name of the contractor responsible</p>
+            <input
+              type="text"
+              value={contractorInput}
+              onChange={(e) => setContractorInput(e.target.value)}
+              placeholder="E.g., ABC Construction Company Ltd..."
+              className="w-full bg-white/10 border border-white/20 rounded-lg p-3 text-white placeholder-gray-500 focus:border-neon-blue focus:outline-none text-sm"
+            />
+          </div>
+
+          {/* Status Selection */}
+          <div>
+            <label className="block text-sm font-mono text-gray-300 mb-2">Report Status</label>
+            <p className="text-xs text-gray-400 mb-2">Select the current status of the issue</p>
+            <select
+              value={reportStatus}
+              onChange={(e) => setReportStatus(e.target.value)}
+              className="w-full bg-white/10 border border-white/20 rounded-lg p-3 text-white focus:border-neon-blue focus:outline-none text-sm"
+            >
+              <option value="Pending" className="bg-gray-800">⏳ Pending - Newly reported</option>
+              <option value="In Progress" className="bg-gray-800">🔄 In Progress - Being investigated</option>
+              <option value="Resolved" className="bg-gray-800">✅ Resolved - Issue fixed</option>
+              <option value="On Hold" className="bg-gray-800">⏸️ On Hold - Waiting for resources</option>
+            </select>
+          </div>
+
+          {/* Location Display */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-mono text-gray-300 mb-1">📍 Latitude</label>
+              {location.latitude ? (
+                <div className="bg-green-500/20 border border-green-500/40 rounded-lg p-3 text-green-300 text-sm font-mono">
+                  {location.latitude.toFixed(6)}
+                </div>
+              ) : (
+                <input
+                  type="number"
+                  step="0.000001"
+                  placeholder="Enter latitude"
+                  value={manualLat}
+                  onChange={(e) => setManualLat(e.target.value)}
+                  className="w-full bg-white/10 border border-white/20 rounded-lg p-3 text-white placeholder-gray-500 focus:border-neon-blue focus:outline-none text-sm"
+                />
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-mono text-gray-300 mb-1">📍 Longitude</label>
+              {location.longitude ? (
+                <div className="bg-green-500/20 border border-green-500/40 rounded-lg p-3 text-green-300 text-sm font-mono">
+                  {location.longitude.toFixed(6)}
+                </div>
+              ) : (
+                <input
+                  type="number"
+                  step="0.000001"
+                  placeholder="Enter longitude"
+                  value={manualLng}
+                  onChange={(e) => setManualLng(e.target.value)}
+                  className="w-full bg-white/10 border border-white/20 rounded-lg p-3 text-white placeholder-gray-500 focus:border-neon-blue focus:outline-none text-sm"
+                />
+              )}
+            </div>
+          </div>
+
+          {/* GPS Status */}
+          <div className="bg-white/5 border border-white/10 rounded-lg p-3 flex items-center justify-between">
+            <span className="text-xs text-gray-400">{gpsStatus}</span>
+            {!location.latitude && (
+              <button
+                onClick={retryGPS}
+                className="text-xs px-2 py-1 bg-neon-blue/20 border border-neon-blue text-neon-blue rounded hover:bg-neon-blue/30 transition-colors"
+              >
+                🔄 Retry GPS
+              </button>
+            )}
+          </div>
+
+          {/* Quick Location Presets */}
+          {!location.latitude && (
+            <div>
+              <label className="block text-sm font-mono text-gray-300 mb-2">Select Location from States</label>
+              
+              {/* Search Input */}
+              <div className="relative mb-2">
+                <input
+                  type="text"
+                  placeholder="🔍 Type state/city name (e.g., 'Mumbai', 'Delhi', 'Bangalore')..."
+                  value={locationSearchInput}
+                  onChange={(e) => {
+                    setLocationSearchInput(e.target.value);
+                    setShowLocationSearch(true);
+                  }}
+                  onFocus={() => setShowLocationSearch(true)}
+                  className="w-full bg-white/10 border border-white/20 rounded-lg p-3 text-white placeholder-gray-500 focus:border-neon-blue focus:outline-none text-sm"
+                />
+                
+                {/* Dropdown Results */}
+                {showLocationSearch && locationSearchInput && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-space-dark border border-white/20 rounded-lg shadow-2xl z-50 max-h-64 overflow-y-auto">
+                    {filteredLocations.length > 0 ? (
+                      filteredLocations.map((loc, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setSelectedLocation(loc.lat, loc.lng)}
+                          className="w-full text-left px-4 py-2 hover:bg-neon-blue/20 border-b border-white/10 transition-all text-sm text-gray-300 hover:text-white"
+                        >
+                          {loc.name}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-2 text-gray-400 text-sm">No locations found</div>
+                    )}
+                  </div>
+                )}
+
+                {/* Selected Location Info */}
+                {(manualLat || manualLng) && (
+                  <div className="mt-2 px-3 py-2 bg-green-500/20 border border-green-500/40 rounded-lg text-green-300 text-sm font-mono">
+                    ✓ Selected: Lat {manualLat}, Lng {manualLng}
+                  </div>
+                )}
+              </div>
+
+              {/* Close button when showing results */}
+              {showLocationSearch && (
+                <button
+                  onClick={() => setShowLocationSearch(false)}
+                  className="text-xs px-2 py-1 bg-white/10 border border-white/20 text-gray-400 rounded hover:bg-white/20 transition-colors"
+                >
+                  ✕ Close
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Image Upload */}
+          <div>
+            <label className="block text-sm font-mono text-gray-300 mb-2">📸 Upload Image Evidence *</label>
+            <p className="text-xs text-gray-400 mb-2">Drag & drop or click to upload a clear photoof the issue</p>
+            <div 
+              className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-neon-blue/50 transition-all duration-300 glass-card cursor-pointer group"
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              onClick={() => document.getElementById('file-upload').click()}
+            >
+              <input id="file-upload" type="file" className="hidden" accept="image/*" onChange={handleChange} />
+              <svg className="w-12 h-12 mx-auto text-gray-500 mb-3 group-hover:text-neon-blue transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <p className="text-gray-400 group-hover:text-gray-200 transition-colors">Drag & drop image here or click to browse</p>
+              {file && <p className="text-neon-blue text-xs mt-2 font-mono">✓ {file.name}</p>}
+            </div>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
+          {/* Image Preview */}
           <div className="relative rounded-xl overflow-hidden glass-card">
-            <img src={image} alt="Audit Preview" className="w-full h-48 object-cover opacity-80 mix-blend-screen" />
+            <img src={preview} alt="Audit Preview" className="w-full h-48 object-cover opacity-80 mix-blend-screen" />
             
             {status === 'analyzing' && (
               <div className="absolute inset-0 bg-space-dark/80 backdrop-blur-sm flex items-center justify-center">
@@ -87,34 +482,128 @@ const AICorruptionAudit = () => {
             {status === 'complete' && (
                <div className="absolute inset-0 bg-space-dark/20 flex flex-col items-center justify-center pointer-events-none">
                   <div className="border border-green-500 bg-green-500/20 px-3 py-1 text-green-400 font-mono text-sm uppercase tracking-widest rounded shadow-[0_0_10px_rgba(74,222,128,0.5)] backdrop-blur-md">
-                    Anomaly Detected
+                    Analysis Complete
                   </div>
                </div>
             )}
             
             {status !== 'analyzing' && (
               <button 
-                onClick={() => { setImage(null); setStatus('idle'); }}
+                onClick={() => { setPreview(null); setFile(null); setStatus('idle'); }}
                 className="absolute top-2 right-2 bg-black/50 p-1.5 rounded-full hover:bg-black/80 text-white border border-white/10"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             )}
           </div>
+
+          {/* Detected Issues */}
+          {status === 'complete' && detectedIssues.length > 0 && (
+            <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+              <h3 className="text-sm font-mono text-neon-blue mb-3 uppercase tracking-widest">Detected Issues</h3>
+              <div className="space-y-2">
+                {detectedIssues.map((issue, idx) => (
+                  <div key={idx} className="flex items-between justify-between bg-white/5 border border-white/10 rounded p-2">
+                    <div className="flex-1">
+                      <div className="text-white text-sm font-semibold capitalize">{issue.issue.replace(/_/g, ' ')}</div>
+                      <div className="text-xs text-gray-400">{issue.category}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className={`text-xs font-mono px-2 py-1 rounded ${
+                        issue.severity === 'critical' ? 'bg-red-500/30 text-red-300' :
+                        issue.severity === 'high' ? 'bg-orange-500/30 text-orange-300' :
+                        issue.severity === 'medium' ? 'bg-yellow-500/30 text-yellow-300' :
+                        'bg-blue-500/30 text-blue-300'
+                      }`}>
+                        {issue.severity.toUpperCase()}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">{issue.confidence}% confidence</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Department & Contractor Info */}
+          {status === 'complete' && (
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-white/5 border border-white/10 rounded-lg p-3">
+                <div className="text-xs text-gray-400 mb-1">🏢 Department</div>
+                <div className="text-sm text-white font-mono">{department}</div>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-lg p-3">
+                <div className="text-xs text-gray-400 mb-1">🔨 Contractor</div>
+                <div className="text-sm text-white font-mono">{contractorInput || contractor}</div>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-lg p-3">
+                <div className="text-xs text-gray-400 mb-1">📊 Status</div>
+                <div className={`text-sm font-mono px-2 py-1 rounded text-center ${
+                  reportStatus === 'Pending' ? 'bg-yellow-500/20 text-yellow-300' :
+                  reportStatus === 'In Progress' ? 'bg-blue-500/20 text-blue-300' :
+                  reportStatus === 'Resolved' ? 'bg-green-500/20 text-green-300' :
+                  'bg-orange-500/20 text-orange-300'
+                }`}>
+                  {reportStatus}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Success Message */}
+          {status === 'complete' && (
+            <div className="p-4 bg-green-500/20 border border-green-500/40 rounded-lg">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <div>
+                  <h4 className="text-green-400 font-semibold text-sm">Report Submitted Successfully!</h4>
+                  <p className="text-green-300/80 text-xs mt-1">The audit report has been sent to the relevant department for investigation.</p>
+                </div>
+              </div>
+            </div>
+          )}
           
           <button 
             onClick={handleSubmit}
-            disabled={status !== 'ready' && status !== 'complete'}
-            className={`w-full py-3 rounded-lg font-semibold tracking-wide transition-all ${
+            disabled={loading || (status === 'analyzing')}
+            className={`w-full py-3 px-4 rounded-lg font-semibold tracking-wide transition-all transform ${
               status === 'ready' 
-                ? 'bg-gradient-to-r from-neon-blue to-neon-purple hover:opacity-90 shadow-[0_0_15px_rgba(56,189,248,0.4)] text-white cursor-pointer' 
+                ? 'bg-gradient-to-r from-neon-blue to-neon-purple hover:opacity-90 hover:scale-105 shadow-[0_0_20px_rgba(56,189,248,0.6)] text-white cursor-pointer' 
                 : status === 'complete'
-                ? 'bg-white/10 border border-white/20 hover:bg-white/20 text-white cursor-pointer'
-                : 'bg-white/5 border border-white/10 text-gray-500 cursor-not-allowed'
+                ? 'bg-gradient-to-r from-green-500/30 to-green-400/30 border border-green-500 hover:from-green-500/40 hover:to-green-400/40 text-green-300 cursor-pointer'
+                : status === 'analyzing'
+                ? 'bg-white/5 border border-white/10 text-gray-500 cursor-not-allowed opacity-50'
+                : 'bg-neon-blue/10 border-2 border-neon-blue text-neon-blue hover:bg-neon-blue/20 cursor-pointer'
             }`}
           >
-            {status === 'complete' ? 'Submit Another' : 'Initiate AI Scan'}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="inline-block w-3 h-3 border-2 border-neon-blue border-t-transparent rounded-full animate-spin"></span>
+                Processing...
+              </span>
+            ) : status === 'complete' ? (
+              <span className="flex items-center justify-center gap-2">
+                ✓ Report Submitted - Submit Another Report
+              </span>
+            ) : status === 'ready' ? (
+              <span className="flex items-center justify-center gap-2">
+                🚀 Initiate AI Scan - Submit Report
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                ⚡ Complete Missing Fields ({file && description.trim() && address.trim() && (location.latitude || manualLat) && (location.longitude || manualLng) ? 'All filled' : 'Check above'})
+              </span>
+            )}
           </button>
+
+          {/* Helpful Tips Below Button */}
+          {status !== 'analyzing' && status !== 'complete' && (
+            <div className="text-xs text-gray-500 text-center mt-2">
+              All fields must be filled before submission. Use GPS or select location manually.
+            </div>
+          )}
         </div>
       )}
     </div>
