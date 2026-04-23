@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-const Navbar = ({ currentUser, onLogout }) => {
+const Navbar = ({ currentUser, onLogout, currentLanguage, onLanguageChange }) => {
   const [time, setTime] = useState(new Date());
   const [backendStatus, setBackendStatus] = useState("Connecting...");
   const [isOnline, setIsOnline] = useState(false);
@@ -46,6 +46,23 @@ const Navbar = ({ currentUser, onLogout }) => {
           <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_rgba(74,222,128,1)] ${isOnline ? 'bg-green-400' : 'bg-red-500'}`}></div>
           <span className="text-sm text-gray-300">{backendStatus}</span>
         </div>
+        
+        {/* Language Selector */}
+        {onLanguageChange && (
+          <select 
+            value={currentLanguage || 'en'} 
+            onChange={(e) => onLanguageChange(e.target.value)}
+            className="bg-space-dark/80 border border-neon-blue/30 text-cyan-300 text-sm rounded-md px-2 py-1.5 focus:outline-none focus:border-neon-blue shadow-[0_0_10px_rgba(56,189,248,0.1)] cursor-pointer"
+          >
+            <option value="en">English</option>
+            <option value="ta">தமிழ் (Tamil)</option>
+            <option value="te">తెలుగు (Telugu)</option>
+            <option value="ml">മലയാളം (Malayalam)</option>
+            <option value="kn">ಕನ್ನಡ (Kannada)</option>
+            <option value="hi">हिंदी (Hindi)</option>
+          </select>
+        )}
+
         <div className="text-sm font-mono text-cyan-300 bg-cyan-950/40 px-3 py-1.5 rounded-md border border-cyan-500/20">
           {time.toLocaleTimeString()}
         </div>
