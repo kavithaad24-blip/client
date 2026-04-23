@@ -6,6 +6,7 @@ import OfflineSync from './components/modules/OfflineSync';
 import LocalIssueVoting from './components/modules/LocalIssueVoting';
 import AdminDashboard from './pages/AdminDashboard';
 import ServiceTracking from './pages/ServiceTracking';
+import Settings from './pages/Settings';
 import AuthLayout from './components/auth/AuthLayout';
 
 function App() {
@@ -164,7 +165,17 @@ function App() {
                 <LocalIssueVoting language={language} />
               </div>
             </div>
-          ) : (
+          ) : currentPage === 'settings' ? (
+            <div>
+              <button 
+                onClick={() => setCurrentPage('dashboard')}
+                className="mb-4 px-4 py-2 bg-white/5 border border-white/20 hover:bg-white/10 rounded-lg text-sm transition-colors"
+              >
+                ← Back to Dashboard
+              </button>
+              <Settings language={language} />
+            </div>
+          ) : currentPage === 'admin' ? (
             <div>
               <button 
                 onClick={() => setCurrentPage('dashboard')}
@@ -174,7 +185,7 @@ function App() {
               </button>
               <AdminDashboard />
             </div>
-          )}
+          ) : null}
         </main>
       </div>
     </div>
